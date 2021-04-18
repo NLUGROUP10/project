@@ -1,0 +1,15 @@
+'statement : NAME EQUALS expression'
+'statement : expression'
+'''expression : expression PLUS expression
+              | expression MINUS expression
+              | expression TIMES expression
+              | expression DIVIDE expression'''
+'expression : MINUS expression %prec UMINUS'
+'expression : LPAREN expression RPAREN'
+'expression : NUMBER'
+'expression : NAME'
+
+equation ->expression = expression
+expression ->expression +term| expression -term|term
+term-> term * factor | term/factor | factor
+factor -> (expression )| id | num
