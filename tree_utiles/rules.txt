@@ -1,4 +1,4 @@
-'statement : NAME EQUALS expression'
+equation : expression EQUALS expression
 'statement : expression'
 '''expression : expression PLUS expression
               | expression MINUS expression
