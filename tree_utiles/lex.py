@@ -170,7 +170,7 @@ import ply.yacc as yacc
 import collections
 yacc.yacc(debug=True)
 # test_data = "x = -(-12.99/4)**-3+(-1/22+2*3)"
-test_data = "-x"
+test_data = "1.1**4"
 yacc.parse(test_data)
 def traverse(root):
     r = []
