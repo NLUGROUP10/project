@@ -1,43 +1,94 @@
 import re
+import pprint
 
 from bert_seq2seq.tokenizer import load_chinese_base_vocab, T5PegasusTokenizer
 from closureparser import make_parser
 import json
 
+from tree_utiles.node import Node
+import numpy as np
 
-def remove_bucket(equation):
-    """去掉冗余的括号
-    """
-    l_buckets, buckets = [], []
-    for i, c in enumerate(equation):
-        if c == '(':
-            l_buckets.append(i)
-        elif c == ')':
-            buckets.append((l_buckets.pop(), i))
-    eval_equation = eval(equation)
-    for l, r in buckets:
-        new_equation = '%s %s %s' % (
-            equation[:l], equation[l + 1:r], equation[r + 1:]
-        )
-        try:
-            if is_equal(eval(new_equation.replace(' ', '')), eval_equation):
-                equation = new_equation
-        except:
-            pass
-    return equation.replace(' ', '')
+def get_data_from_root(root:Node,width = 2, depth = 10):
 
-def is_equal(a, b):
-    """比较两个结果是否相等
-    """
-    a = round(float(a), 6)
-    b = round(float(b), 6)
-    return a == b
+    pre_order = root.pre_order_traverse(root)
+    types = []
+    values = []
+    paths = []
+    rels = []
+    onehots =  np.identity(width, dtype=int).tolist()
+    def longestCommonPrefix(strs):
+        ret = ''
+        for i in zip(*strs):
+            if len(set(i)) == 1:
+                ret += i[0]
+            else:
+                break
+        return ret
+
+    def path2positioncode(path:str):
+        res = []
+        final = [0]*(width*depth)
+        path = path[1:]
+        path = path[::-1]
+        for c in path:
+            res = res+onehots[int(c)]
+        res = res[:depth*width]
+        final[:len(res)] = res
+        return final
+    num_node = len(pre_order)
+    for i in range(num_node):
+        line_i = []
+        for j in range(num_node):
+            path1 = pre_order[i][1]
+            path2 = pre_order[j][1]
+            common = longestCommonPrefix([path1,path2])
+            upper = len(path1)-len(common)
+            down  = len(path2)-len(common)
+            rel = f"{upper}|{down}"
+            line_i.append(rel)
+        rels.append(line_i)
+    for i in pre_order:
+        types.append(json.loads(i[0])[0])
+        values.append(json.loads(i[0])[1])
+        paths.append(path2positioncode(i[1]))
+    res_dict = {"types":types,"values":values,"paths":paths,"rels":rels}
+    return json.dumps(res_dict)
+
+
 
 ## 苏神baseline 读取数据
 def load_data(filename):
     """读取训练数据，并做一些标准化，保证equation是可以eval的
     参考：https://kexue.fm/archives/7809
     """
+
+    def remove_bucket(equation):
+        """去掉冗余的括号
+        """
+        l_buckets, buckets = [], []
+        for i, c in enumerate(equation):
+            if c == '(':
+                l_buckets.append(i)
+            elif c == ')':
+                buckets.append((l_buckets.pop(), i))
+        eval_equation = eval(equation)
+        for l, r in buckets:
+            new_equation = '%s %s %s' % (
+                equation[:l], equation[l + 1:r], equation[r + 1:]
+            )
+            try:
+                if is_equal(eval(new_equation.replace(' ', '')), eval_equation):
+                    equation = new_equation
+            except:
+                pass
+        return equation.replace(' ', '')
+
+    def is_equal(a, b):
+        """比较两个结果是否相等
+        """
+        a = round(float(a), 6)
+        b = round(float(b), 6)
+        return a == b
     D = []
     # index = 0
     for l in open(filename,encoding="utf-8"):
@@ -68,30 +119,28 @@ def load_data(filename):
             # print(answer)
             # print("~~~~~~~`")
             if is_equal(eval(equation), eval(answer)):
-                D.append([question, remove_bucket(equation), answer])
+                D.append([question,answer, remove_bucket(equation) ])
         except Exception as e:
             print(e)
             continue
     for data in D:
-        data[1]= "x=" + data[1]
-
-
-
+        data[2]= "x=" + data[2]
     return D
 
 if __name__ == '__main__':
-    path = r"C:\Users\tianshu\PycharmProjects\project\data\ape\train.ape.json"
+    path = r"C:\Users\tianshu\PycharmProjects\project\data\ape\test.ape.json"
     datas = load_data(path)
     cal = make_parser()
+    D = []
     for data in datas:
         # print(cal(data[1]),"\t\t\t",data)
         # print(data)
-        res = cal(data[1])
+        res = cal(data[2])
         # res.display()
         # print(res)
-        if res==None:
-            print(data)
-    # # print(datas)
+        tree = get_data_from_root(res)
+        D.append([data[0],data[1],tree])
+    # # # print(datas)
     # vocab_path = r"D:\codeproject\NLP\models\chinese_t5_pegasus_small\vocab.txt"
     # model_path = r"D:\codeproject\NLP\models\chinese_t5_pegasus_small\pytorch_model.bin"
     # model_save_path = r"D:\codeproject\NLP\models\chinese_t5_pegasus_small\t5_ancient_trans_model.bin"
@@ -103,4 +152,25 @@ if __name__ == '__main__':
     # # print(res)
     # res1 = [token for token in res[1:-1]]
     # print(res1)
+    # def longestCommonPrefix(strs):
+    #     ret = ''
+    #     for i in zip(*strs):
+    #         if len(set(i)) == 1:
+    #             ret += i[0]
+    #         else:
+    #             break
+    #     return ret
+    # testdata = "x =8/(1/-8000000)/100000.0"
+    # res:Node = cal(testdata)
+    # types,values,paths,rels = get_data_from_root(res)
+    # pp = pprint.PrettyPrinter(width=200, compact=True)
+    # pp.pprint(types)
+    # pp.pprint(values)
+    # pp.pprint(rels)
+    # pp.pprint(paths)
+    # pp.pprint(res.pre_order_traverse(res))
+    # res.display()
+    print(D)
+
+
 

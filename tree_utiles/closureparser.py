@@ -83,10 +83,12 @@ def make_parser():
     def p_equation_assign(p):
         'equation : expression EQUALS expression'
         temp = Node(json.dumps(["operator_2",p[2]]), p[1], p[3])
+        # temp = temp.add_root_node(temp)
         p[0] = temp
         # print((p[0]))
         global res_head
         res_head = p[0]
+
 
 
     def p_expression_binop(p):
@@ -138,12 +140,12 @@ def make_parser():
         l = tokenize(s)
         global res_head
         if len(l)==1:
-            p[0] = Node(json.dumps(("float_1", l[0])))
+            p[0] = Node(json.dumps(("float_0", l[0])))
 
             res_head = p[0]
         else:
             # p[0] = Node(json.dumps(("int", p[1])))
-            node1 = Node(json.dumps(("float_2", l[0])))
+            node1 = Node(json.dumps(("float_1", l[0])))
             node1.right = make_sub_number_tree(l[1:])
             p[0] = node1
             res_head = p[0]
@@ -168,6 +170,7 @@ def make_parser():
     parser = yacc.yacc()
     def input(text):
         result = parser.parse(text, lexer=lexer)
+        result = result.add_root_node(result)
         return result
 
     return input
@@ -175,14 +178,16 @@ def make_parser():
 if __name__ == '__main__':
     calc = make_parser()
     # print(calc("x = -(-12.99/4)**-3*2+1"))
-    # testdata = "x = -(-12.99/4)**-3*2+1"
-    testdata = "x=8/(1/-8000000)/100000.0"
+    testdata = "x = -(-12.99/4)**-3*2+1"
+    # testdata = "x =8/(1/-8000000)/100000.0"
     res:Node = calc(testdata)
-    res = res.add_root_node(res)
     print(testdata)
     res.display()
     print(res.pre_order_traverse(res))
-
+    string = res.serialize(res)
+    print(res.serialize(res))
+    root2 = Node.deserialize(string)
+    root2.display()
 
 
 

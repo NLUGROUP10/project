@@ -1,3 +1,4 @@
+import collections
 import json
 
 
@@ -6,6 +7,54 @@ class Node:
         self.val = val
         self.left = left
         self.right = right
+
+
+    @staticmethod
+    def serialize(root):
+        """Encodes a tree to a single string.
+
+        :type root: TreeNode
+        :rtype: str
+        """
+        if not root:
+            return ""
+        queue = collections.deque([root])
+        res = []
+        while queue:
+            node = queue.popleft()
+            if node:
+                res.append(str(node.val))
+                queue.append(node.left)
+                queue.append(node.right)
+            else:
+                res.append('None')
+        return json.dumps(res)
+
+
+    @staticmethod
+    def deserialize(data:str):
+        """Decodes your encoded data to tree.
+
+        :type data: str
+        :rtype: TreeNode
+        """
+        if not data:
+            return []
+        dataList = json.loads(data)
+        root = Node(dataList[0])
+        queue = collections.deque([root])
+        i = 1
+        while queue:
+            node = queue.popleft()
+            if dataList[i] != 'None':
+                node.left = Node(dataList[i])
+                queue.append(node.left)
+            i += 1
+            if dataList[i] != 'None':
+                node.right = Node(dataList[i])
+                queue.append(node.right)
+            i += 1
+        return root
 
     def display(self):
         lines, *_ = self._display_aux()
