@@ -1,5 +1,6 @@
 import re
 
+from bert_seq2seq.tokenizer import load_chinese_base_vocab, T5PegasusTokenizer
 from closureparser import make_parser
 import json
 
@@ -77,16 +78,27 @@ def load_data(filename):
     return D
 
 if __name__ == '__main__':
-    path = r"C:\Users\tianshu\PycharmProjects\project\data\ape\valid.ape.json"
-    datas = load_data(path)
-    cal = make_parser()
-    for data in datas:
-        # print(cal(data[1]),"\t\t\t",data)
-        print(data)
-        res = cal(data[1])
-        res.display()
-        # print(res)
-        if res==None:
-            print(data)
-    # print(datas)
+    # path = r"C:\Users\tianshu\PycharmProjects\project\data\ape\valid.ape.json"
+    # datas = load_data(path)
+    # cal = make_parser()
+    # for data in datas:
+    #     # print(cal(data[1]),"\t\t\t",data)
+    #     print(data)
+    #     res = cal(data[1])
+    #     res.display()
+    #     # print(res)
+    #     if res==None:
+    #         print(data)
+    # # print(datas)
+    vocab_path = r"D:\codeproject\NLP\models\chinese_t5_pegasus_small\vocab.txt"
+    model_path = r"D:\codeproject\NLP\models\chinese_t5_pegasus_small\pytorch_model.bin"
+    model_save_path = r"D:\codeproject\NLP\models\chinese_t5_pegasus_small\t5_ancient_trans_model.bin"
+    batch_size = 2
+    lr = 1e-5
+    word2idx = load_chinese_base_vocab(vocab_path)
+    tokenizer = T5PegasusTokenizer(word2idx)
+    res = tokenizer.tokenize("3.14159256165623156198789465132165454656")
+    # print(res)
+    res1 = [token for token in res[1:-1]]
+    print(res1)
 

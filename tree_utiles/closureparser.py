@@ -1,13 +1,34 @@
 import json
+from typing import List
+
+from bert_seq2seq.tokenizer import load_chinese_base_vocab, T5PegasusTokenizer
 from node import Node
 import ply.lex as  lex
 import ply.yacc as yacc
 def make_parser():
+    vocab_path = r"D:\codeproject\NLP\models\chinese_t5_pegasus_small\vocab.txt"
+    word2idx = load_chinese_base_vocab(vocab_path)
+    tokenizer = T5PegasusTokenizer(word2idx)
+
+    def tokenize(s:str):
+        res = tokenizer.tokenize(s)
+        return [token for token in res[1:-1]]
+
+    def make_sub_number_tree(l: List[str]):
+        last = None
+        for substr in l[::-1]:
+            tmp = Node(json.dumps(("subnum", substr)))
+            tmp.right = last
+            last = tmp
+        return last
+
     tokens = (
         'NAME', 'INT', 'FLOAT',
         'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'EQUALS', 'POWER',
         'LPAREN', 'RPAREN',
     )
+
+
 
     # Tokens
 
@@ -64,7 +85,6 @@ def make_parser():
         global res_head
         res_head = p[0]
 
-    # todo 优先级问题
 
     def p_expression_binop(p):
         '''expression : expression PLUS expression
@@ -96,15 +116,35 @@ def make_parser():
 
     def p_expression_int(p):
         'expression : INT'
-        p[0] = Node(json.dumps(("int", p[1])))
+        s = str(p[1])
+        l = tokenize(s)
         global res_head
-        res_head = p[0]
+        if len(l)==1:
+            p[0] = Node(json.dumps(("int", l[0])))
+            res_head = p[0]
+        else:
+            # p[0] = Node(json.dumps(("int", p[1])))
+            node1 = Node(json.dumps(("int", l[0])))
+            node1.right = make_sub_number_tree(l[1:])
+            p[0] = node1
+            res_head = p[0]
 
     def p_expression_float(p):
         'expression : FLOAT'
-        p[0] = Node(json.dumps(("float", p[1])))
+        s = str(p[1])
+        l = tokenize(s)
         global res_head
-        res_head = p[0]
+        if len(l)==1:
+            p[0] = Node(json.dumps(("float", l[0])))
+
+            res_head = p[0]
+        else:
+            # p[0] = Node(json.dumps(("int", p[1])))
+            node1 = Node(json.dumps(("float", l[0])))
+            node1.right = make_sub_number_tree(l[1:])
+            p[0] = node1
+            res_head = p[0]
+
 
     def p_expression_name(p):
         'expression : NAME'
@@ -133,8 +173,9 @@ if __name__ == '__main__':
     calc = make_parser()
     # print(calc("x = -(-12.99/4)**-3*2+1"))
     # testdata = "x = -(-12.99/4)**-3*2+1"
-    testdata = "x=8/(1/8000000)/100000"
+    testdata = "x=8/(1/8000000)/100000.0"
     res = calc(testdata)
+    print(testdata)
     res.display()
 
 
