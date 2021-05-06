@@ -51,8 +51,8 @@ def get_data_from_root(root:Node,width = 2, depth = 10):
         types.append(json.loads(i[0])[0])
         values.append(json.loads(i[0])[1])
         paths.append(path2positioncode(i[1]))
-    res_dict = {"types":types,"values":values,"paths":paths,"rels":rels}
-    return json.dumps(res_dict)
+    res_dict = {"types":types,"values":values,"paths":paths,"rels":rels,"serialize":root.serialize(root)}
+    return json.dumps(res_dict,ensure_ascii=False)
 
 
 
@@ -127,9 +127,8 @@ def load_data(filename):
         data[2]= "x=" + data[2]
     return D
 
-if __name__ == '__main__':
-    path = r"C:\Users\tianshu\PycharmProjects\project\data\ape\test.ape.json"
-    datas = load_data(path)
+def prepare(path_in,path_save):
+    datas = load_data(path_in)
     cal = make_parser()
     D = []
     for data in datas:
@@ -139,38 +138,18 @@ if __name__ == '__main__':
         # res.display()
         # print(res)
         tree = get_data_from_root(res)
-        D.append([data[0],data[1],tree])
-    # # # print(datas)
-    # vocab_path = r"D:\codeproject\NLP\models\chinese_t5_pegasus_small\vocab.txt"
-    # model_path = r"D:\codeproject\NLP\models\chinese_t5_pegasus_small\pytorch_model.bin"
-    # model_save_path = r"D:\codeproject\NLP\models\chinese_t5_pegasus_small\t5_ancient_trans_model.bin"
-    # batch_size = 2
-    # lr = 1e-5
-    # word2idx = load_chinese_base_vocab(vocab_path)
-    # tokenizer = T5PegasusTokenizer(word2idx)
-    # res = tokenizer.tokenize("3.14159256165623156198789465132165454656")
-    # # print(res)
-    # res1 = [token for token in res[1:-1]]
-    # print(res1)
-    # def longestCommonPrefix(strs):
-    #     ret = ''
-    #     for i in zip(*strs):
-    #         if len(set(i)) == 1:
-    #             ret += i[0]
-    #         else:
-    #             break
-    #     return ret
-    # testdata = "x =8/(1/-8000000)/100000.0"
-    # res:Node = cal(testdata)
-    # types,values,paths,rels = get_data_from_root(res)
-    # pp = pprint.PrettyPrinter(width=200, compact=True)
-    # pp.pprint(types)
-    # pp.pprint(values)
-    # pp.pprint(rels)
-    # pp.pprint(paths)
-    # pp.pprint(res.pre_order_traverse(res))
-    # res.display()
-    print(D)
+        D.append(json.dumps([data[0],data[2],data[1],tree],ensure_ascii=False))
+    with open(path_save,"w+",encoding="utf-8") as outpath:
+        for line in D:
+            outpath.write(line)
+            outpath.write('\n')
+if __name__ == '__main__':
+    splits = ["train","test","valid"]
+    for split in splits:
+        path = f"C:\\Users\\tianshu\\PycharmProjects\\project\\data\\ape\\{split}.ape.json"
+        outpath = f"C:\\Users\\tianshu\\PycharmProjects\\project\\data\\ape\\cleaned\\{split}.ape.json"
+        prepare(path,outpath)
+
 
 
 
