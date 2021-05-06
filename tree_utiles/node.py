@@ -1,3 +1,6 @@
+import json
+
+
 class Node:
     def __init__(self, val, left=None, right=None):
         self.val = val
@@ -70,4 +73,12 @@ class Node:
                 branchright = branchright+"1"
                 helper(root.right, branchright)
         helper(root)
-        print(res)
+        return res
+
+    @staticmethod
+    def add_root_node(root):
+        start = Node(json.dumps(["start_2","empty"]))
+        end   = Node(json.dumps(["end_0","empty"]))
+        start.right = end
+        start.left = root
+        return start

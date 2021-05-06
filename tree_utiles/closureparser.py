@@ -16,8 +16,11 @@ def make_parser():
 
     def make_sub_number_tree(l: List[str]):
         last = None
-        for substr in l[::-1]:
-            tmp = Node(json.dumps(("subnum", substr)))
+        for i,substr in enumerate(l[::-1]):
+            if i==0:
+                tmp = Node(json.dumps(["subnum_0", substr]))
+            else:
+                tmp = Node(json.dumps(["subnum_1", substr]))
             tmp.right = last
             last = tmp
         return last
@@ -79,7 +82,7 @@ def make_parser():
 
     def p_equation_assign(p):
         'equation : expression EQUALS expression'
-        temp = Node('=', p[1], p[3])
+        temp = Node(json.dumps(["operator_2",p[2]]), p[1], p[3])
         p[0] = temp
         # print((p[0]))
         global res_head
@@ -92,19 +95,19 @@ def make_parser():
                       | expression TIMES expression
                       | expression DIVIDE expression
                       | expression POWER expression'''
-        p[0] = Node(p[2], p[1], p[3])
+        p[0] = Node(json.dumps(["operator_2",p[2]]), p[1], p[3])
         global res_head
         res_head = p[0]
 
     def p_expression_uminus(p):
         'expression : MINUS expression %prec UMINUS'
-        p[0] = Node('-', left=None, right=p[2])
+        p[0] = Node(json.dumps(["operator_1",'-']), left=None, right=p[2])
         global res_head
         res_head = p[0]
 
     def p_expression_uplus(p):
         'expression : PLUS expression %prec UPLUS'
-        p[0] = Node('+', left=None, right=p[2])
+        p[0] = Node(json.dumps(["operator_1",'+']), left=None, right=p[2])
         global res_head
         res_head = p[0]
 
@@ -120,11 +123,11 @@ def make_parser():
         l = tokenize(s)
         global res_head
         if len(l)==1:
-            p[0] = Node(json.dumps(("int", l[0])))
+            p[0] = Node(json.dumps(("int_0", l[0])))
             res_head = p[0]
         else:
             # p[0] = Node(json.dumps(("int", p[1])))
-            node1 = Node(json.dumps(("int", l[0])))
+            node1 = Node(json.dumps(("int_1", l[0])))
             node1.right = make_sub_number_tree(l[1:])
             p[0] = node1
             res_head = p[0]
@@ -135,12 +138,12 @@ def make_parser():
         l = tokenize(s)
         global res_head
         if len(l)==1:
-            p[0] = Node(json.dumps(("float", l[0])))
+            p[0] = Node(json.dumps(("float_1", l[0])))
 
             res_head = p[0]
         else:
             # p[0] = Node(json.dumps(("int", p[1])))
-            node1 = Node(json.dumps(("float", l[0])))
+            node1 = Node(json.dumps(("float_2", l[0])))
             node1.right = make_sub_number_tree(l[1:])
             p[0] = node1
             res_head = p[0]
@@ -149,7 +152,7 @@ def make_parser():
     def p_expression_name(p):
         'expression : NAME'
         try:
-            p[0] = Node(names[p[1]])
+            p[0] = Node(json.dumps(["var_0",p[1]]))
         except LookupError:
             print(f"Undefined name {p[1]!r}")
             p[0] = 0
@@ -173,10 +176,12 @@ if __name__ == '__main__':
     calc = make_parser()
     # print(calc("x = -(-12.99/4)**-3*2+1"))
     # testdata = "x = -(-12.99/4)**-3*2+1"
-    testdata = "x=8/(1/8000000)/100000.0"
-    res = calc(testdata)
+    testdata = "x=8/(1/-8000000)/100000.0"
+    res:Node = calc(testdata)
+    res = res.add_root_node(res)
     print(testdata)
     res.display()
+    print(res.pre_order_traverse(res))
 
 
 
