@@ -8,8 +8,10 @@ import torch.nn.functional as F
 from torch import nn
 from torch.nn import CrossEntropyLoss
 
+# from seq2tree_encoder import T5Stack
+# from seq2tree_decoder import TreeDecoderStack
+from seq2tree_decoder import TreeDecoderStack
 from seq2tree_encoder import T5Stack
-from seq2tree.seq2tree_decoder import TreeDecoderStack
 
 
 class T5SmallConfig:
@@ -53,6 +55,18 @@ class T5SmallConfig:
         self.initializer_factor = initializer_factor
         self.feed_forward_proj = feed_forward_proj
         self.use_cache = use_cache
+        self.decoder_d_kv = d_kv
+        self.decoder_num_heads = self.num_heads
+        self.decoer_dropout_rate = self.dropout_rate
+
+
+
+
+        self.n_embd = self.d_model
+        self.width = 2
+        self.depth = 64
+        self.rel_vocab_size = (self.depth)**2+1
+        self.decoder_d_model = self.d_model
 
     @property
     def hidden_size(self):
@@ -95,7 +109,7 @@ class Seq2TreeModel(nn.Module):
         self.decoder = TreeDecoderStack(decoder_config)
 
         self.types_lm_head = nn.Linear(config.d_model, config.types_vocab_size, bias=False)
-        self.values_lm_head = nn.Linear(config.d_model, config.types_vocab_size, bias=False)
+        self.values_lm_head = nn.Linear(config.d_model, config.values_vocab_size, bias=False)
 
         # Model parallel
         self.model_parallel = False
@@ -161,7 +175,7 @@ class Seq2TreeModel(nn.Module):
 
         hidden_states = encoder_outputs[0]
 
-        types,values,tree_positions,rel = decoder_input_dict["types"], decoder_input_dict["values"],["tree_positions"],decoder_input_dict["rel_tokens"]
+        types,values,tree_positions,rel = decoder_input_dict["types"], decoder_input_dict["values"],decoder_input_dict["tree_positions"],decoder_input_dict["rel_tokens"]
         # Decode
         sequence_output = self.decoder(
             types,

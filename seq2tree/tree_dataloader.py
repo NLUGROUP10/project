@@ -138,7 +138,7 @@ class Seq2TreeData(Dataset):
             # to_shape[max_len,wxd]
             padded_positions = [item + [[0 for _ in range(wxd)] for _ in range(max(0, max_len - len(item)))] for item in
                                 indices]
-            return torch.tensor(padded_positions)
+            return torch.tensor(padded_positions,dtype=torch.int)
 
         def padding_rels(rels, max_len, pad_idx=0):
             res = torch.zeros([len(rels), max_len, max_len], dtype=torch.int32)

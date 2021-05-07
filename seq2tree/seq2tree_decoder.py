@@ -221,7 +221,8 @@ class TreeAttention(nn.Module):
         self.o = nn.Linear(self.inner_dim, self.d_model, bias=False)
 
 
-        self.rel_weights = nn.Embedding(self.rel_vocab_size, self.n_head)
+        self.rel_weights = nn.Embedding(self.rel_vocab_size, self.n_heads)
+        self.additive = True
 
     def forward(
             self,
@@ -247,6 +248,7 @@ class TreeAttention(nn.Module):
         if rel is not None:
             #use self mode
             rel = self.rel_weights(rel)
+            rel = rel.permute(0, 3, 1, 2)
 
 
         if past_key_value is not None:
@@ -362,8 +364,8 @@ class TreeLayerSelfAttention(nn.Module):
     def forward(
         self,
         hidden_states,
+        rel,
         attention_mask=None,
-        position_bias=None,
         layer_head_mask=None,
         past_key_value=None,
         use_cache=False,
@@ -372,8 +374,8 @@ class TreeLayerSelfAttention(nn.Module):
         normed_hidden_states = self.layer_norm(hidden_states)
         attention_output = self.SelfAttention(
             normed_hidden_states,
+            rel=rel,
             mask=attention_mask,
-            position_bias=position_bias,
             layer_head_mask=layer_head_mask,
             past_key_value=past_key_value,
             use_cache=use_cache,
@@ -394,9 +396,9 @@ class TreeLayerCrossAttention(nn.Module):
     def forward(
         self,
         hidden_states,
-        key_value_states,
+        rel=None,
+        key_value_states = None,
         attention_mask=None,
-        position_bias=None,
         layer_head_mask=None,
         past_key_value=None,
         use_cache=False,
@@ -408,7 +410,6 @@ class TreeLayerCrossAttention(nn.Module):
             normed_hidden_states,
             mask=attention_mask,
             key_value_states=key_value_states,
-            position_bias=position_bias,
             layer_head_mask=layer_head_mask,
             past_key_value=past_key_value,
             use_cache=use_cache,
@@ -436,10 +437,8 @@ class TreeDecoderBlock(nn.Module):
         hidden_states,
         rel,
         attention_mask=None,
-        position_bias=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
-        encoder_decoder_position_bias=None,
         layer_head_mask=None,
         encoder_layer_head_mask=None,
         past_key_value=None,
@@ -468,7 +467,6 @@ class TreeDecoderBlock(nn.Module):
             hidden_states,
             rel,
             attention_mask=attention_mask,
-            position_bias=position_bias,
             layer_head_mask=layer_head_mask,
             past_key_value=self_attn_past_key_value,
             use_cache=use_cache,
@@ -496,7 +494,6 @@ class TreeDecoderBlock(nn.Module):
                 rel = None,
                 key_value_states=encoder_hidden_states,
                 attention_mask=encoder_attention_mask,
-                position_bias=encoder_decoder_position_bias,
                 layer_head_mask=encoder_layer_head_mask,
                 past_key_value=cross_attn_past_key_value,
                 query_length=query_length,
@@ -737,8 +734,8 @@ class TreeDecoderStack(nn.Module):
         all_hidden_states = None
         all_attentions = () if output_attentions else None
         all_cross_attentions = () if (output_attentions and self.is_decoder) else None
-        position_bias = None
-        encoder_decoder_position_bias = None
+        # position_bias = None
+        # encoder_decoder_position_bias = None
 
         hidden_states = self.dropout(inputs_embeds)
 
@@ -751,14 +748,14 @@ class TreeDecoderStack(nn.Module):
                 # Ensure that attention_mask is always on the same device as hidden_states
                 if attention_mask is not None:
                     attention_mask = attention_mask.to(hidden_states.device)
-                if position_bias is not None:
-                    position_bias = position_bias.to(hidden_states.device)
+                # if position_bias is not None:
+                #     position_bias = position_bias.to(hidden_states.device)
                 if encoder_hidden_states is not None:
                     encoder_hidden_states = encoder_hidden_states.to(hidden_states.device)
                 if encoder_extended_attention_mask is not None:
                     encoder_extended_attention_mask = encoder_extended_attention_mask.to(hidden_states.device)
-                if encoder_decoder_position_bias is not None:
-                    encoder_decoder_position_bias = encoder_decoder_position_bias.to(hidden_states.device)
+                # if encoder_decoder_position_bias is not None:
+                #     encoder_decoder_position_bias = encoder_decoder_position_bias.to(hidden_states.device)
                 if layer_head_mask is not None:
                     layer_head_mask = layer_head_mask.to(hidden_states.device)
                 if encoder_layer_head_mask is not None:
@@ -770,10 +767,9 @@ class TreeDecoderStack(nn.Module):
                 hidden_states,
                 rel,
                 attention_mask=extended_attention_mask,
-                position_bias=position_bias,
                 encoder_hidden_states=encoder_hidden_states,
                 encoder_attention_mask=encoder_extended_attention_mask,
-                encoder_decoder_position_bias=encoder_decoder_position_bias,
+                # encoder_decoder_position_bias=encoder_decoder_position_bias,
                 layer_head_mask=None,
                 encoder_layer_head_mask=None,
                 past_key_value=past_key_value,
@@ -787,9 +783,9 @@ class TreeDecoderStack(nn.Module):
             # We share the position biases between the layers - the first layer store them
             # layer_outputs = hidden-states, key-value-states (self-attention weights),
             # (self-attention position bias), (cross-attention weights), (cross-attention position bias)
-            position_bias = layer_outputs[2]
-            if self.is_decoder and encoder_hidden_states is not None:
-                encoder_decoder_position_bias = layer_outputs[4 if output_attentions else 3]
+            # position_bias = layer_outputs[2]
+            # if self.is_decoder and encoder_hidden_states is not None:
+            #     encoder_decoder_position_bias = layer_outputs[4 if output_attentions else 3]
             # append next layer key value states
             if use_cache:
                 present_key_value_states = present_key_value_states + (present_key_value_state,)
@@ -813,5 +809,5 @@ class TreeDecoderStack(nn.Module):
             all_hidden_states = all_hidden_states + (hidden_states,)
 
 
-        return (hidden_states,)
+        return hidden_states
 
