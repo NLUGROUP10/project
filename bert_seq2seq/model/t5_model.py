@@ -1242,6 +1242,14 @@ def get_extended_attention_mask(attention_mask, input_shape, device, is_decoder=
     extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
     return extended_attention_mask
 
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
     config = T5Config()
     model = T5Model(config)
