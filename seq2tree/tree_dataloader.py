@@ -63,6 +63,8 @@ class Vocab:
             line = self.decode(line)
             res.append(line)
         return res
+    def size(self):
+        return len(self.list)
 
 
 class Seq2TreeData(Dataset):
