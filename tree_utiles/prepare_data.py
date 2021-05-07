@@ -8,7 +8,7 @@ import json
 from tree_utiles.node import Node
 import numpy as np
 
-def get_data_from_root(root:Node,width = 2, depth = 10):
+def get_data_from_root(root:Node,width = 2, depth = 64):
 
     pre_order = root.pre_order_traverse(root)
     types = []
