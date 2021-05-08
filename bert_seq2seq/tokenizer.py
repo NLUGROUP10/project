@@ -345,6 +345,18 @@ class Tokenizer(BasicTokenizer):
         """
         return bool(ch) and (ch[0] == '[') and (ch[-1] == ']')
 
+
+    def batch_encode(self,texts:List[str],pad_id,max_length = 256):
+        ids = []
+        maxlen = 0
+        for t in texts:
+            id,_ = self.encode(t,max_length=max_length)
+            ids.append(id)
+            maxlen = max(maxlen,len(id))
+        padded = [item + [pad_id]*max(0,maxlen-len(item)) for item in ids]
+        return padded
+
+
 class T5PegasusTokenizer(Tokenizer):
     def __init__(self, token_dict, pre_tokenizer=lambda x: jieba.cut(x, HMM=False)):
         super().__init__(token_dict)
@@ -358,6 +370,8 @@ class T5PegasusTokenizer(Tokenizer):
             else:
                 split_tokens.extend(super()._tokenize(text))
         return split_tokens
+
+
 
 
 if __name__ == "__main__":

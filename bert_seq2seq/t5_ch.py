@@ -62,6 +62,7 @@ class T5Model(BasicT5):
         self.bos_id = self.word2idx["[CLS]"]
         self.eos_id = self.word2idx["[SEP]"]
         self.unk_id = self.word2idx["[UNK]"]
+        self.pad_id = self.word2idx['[PAD]']
 
     def forward(self, input_ids, decoder_input_ids, labels=None):
         input_ids = input_ids.to(self.device)
@@ -99,25 +100,90 @@ class T5Model(BasicT5):
         return self.tokenizer.decode(output_ids)
 
 
-    # def beam_search(self, ):
+    def beam_search(self, input_text,beam_size,input_max_length = 256,out_max_length = 50):
+        self.out_max_length = out_max_length
+        input_token_ids = [input_text for _ in range(beam_size)]
+        input_token_ids = self.tokenizer.batch_encode(input_token_ids,self.pad_id,max_length=input_max_length)
+        input_token_ids = torch.tensor(input_token_ids,dtype=torch.long,device=self.device)
+
+        input_decoder_ids = torch.tensor(self.bos_id, device=self.device, dtype=torch.long).repeat(beam_size,1).view(beam_size, -1)
+        beam_scores = torch.zeros((1, beam_size),device=self.device)
+        beam_scores[:, 1:] = -1e9
+        complete_seqs = []
+        complete_seqs_scores = []
+        with torch.no_grad():
+            # output_scores = torch.zeros(input_token_ids.shape[0],device=self.device)
+            for step in range(self.out_max_length):
+                outputs = self.model.forward(input_ids=input_token_ids,decoder_input_ids=input_decoder_ids)[0]
+                next_token_logits = outputs[:, -1, :]
+                scores = F.log_softmax(next_token_logits, dim=-1) #[beam,voc]
+                vocab_size = scores.size(-1)
+                next_scores = scores + beam_scores.view(beam_size,-1).expand_as(scores)
+                next_scores = next_scores.view(
+                    1, beam_size*vocab_size
+                )
+                next_scores, next_tokens = torch.topk(next_scores, beam_size, dim=1, largest=True, sorted=True)
+                beam_id = next_tokens // vocab_size  # 行索引
+                new_token_id = next_tokens % vocab_size
+
+                beam_scores = next_scores
+
+                input_decoder_ids = torch.cat([input_decoder_ids[beam_id].squeeze(0),new_token_id.view(beam_size,-1)],dim=-1)
+
+                end_counts = (input_decoder_ids == self.eos_id).sum(1)  # 统计出现的end标记
+                best_one = beam_scores.argmax()
+                if end_counts[best_one] == 1:
+                    return input_decoder_ids[best_one][:-1]
+                else:
+                    flag = (end_counts < 1)
+                    if not flag.all():
+                        input_token_ids = input_token_ids[flag]
+                        input_decoder_ids = input_decoder_ids[flag]
+                        beam_scores = beam_scores.view(beam_size,-1)[flag].view(1,-1)
+                        beam_size = flag.sum()
+            return input_decoder_ids[beam_scores.argmax()]
 
 
-    def beam_search(self, num_beams, memory, max_length=20, pad_token_id=0, sos_token_id=1, eos_token_id=2,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def batched_beam_search(self, src_tokens, num_beams, memory,max_in_length = 256, max_out_length=200, pad_token_id=0, sos_token_id=1, eos_token_id=2,
                     length_penalty=1):
+        # //todo finish batch encodiing
+        decoder = None
+
+        token_out = self.tokenizer.encode(src_tokens,max_in_length)
+
+
         batch_size, box_num, d_model = memory.size() #[b,len,hidden]
         beam_scores = torch.zeros((batch_size, num_beams)).to('cuda')  # 定义scores向量，保存累加的log_probs #[b,beam]
         beam_scores[:, 1:] = -1e9  # 需要初始化为-inf [[0,-10000],[0,-10000]]
         beam_scores = beam_scores.view(-1)  # 展开为(batch_size * num_beams),1
         done = [False for _ in range(batch_size)]  # 标记每个输入句子的beam search是否完成
         generated_hyps = [
-            BeamHypotheses(num_beams, max_length, length_penalty=length_penalty)
+            BeamHypotheses(num_beams, max_out_length, length_penalty=length_penalty)
             for _ in range(batch_size)
         ]  # 为每个输入句子定义维护其beam search序列的类实例
         # 初始输入: （batch_size * num_beams, 1）个sos token
         input_ids = torch.full((batch_size * num_beams, 1), sos_token_id, dtype=torch.long).to('cuda') #[b*beam,1]
         memory = memory.repeat(1, num_beams, 1).reshape(batch_size * num_beams, box_num, d_model) #[b*beam,len,hidden]
         cur_len = 1
-        while cur_len < max_length:
+        while cur_len < max_out_length:
             # outputs: (batch_size*num_beams, cur_len, vocab_size)
             outputs = decoder(memory, input_ids)
             # 取最后一个timestep的输出 (batch_size*num_beams, vocab_size)
@@ -217,14 +283,14 @@ class T5Model(BasicT5):
                 sent_lengths[effective_batch_idx] = len(best_hyp)
                 best.append(best_hyp)
         if sent_lengths.min().item() != sent_lengths.max().item():
-            sent_max_len = min(sent_lengths.max().item() + 1, max_length)
+            sent_max_len = min(sent_lengths.max().item() + 1, max_out_length)
             # fill pad
             decoded = input_ids.new(output_batch_size, sent_max_len).fill_(pad_token_id)
 
             # 填充内容
             for i, hypo in enumerate(best):
                 decoded[i, : sent_lengths[i]] = hypo
-                if sent_lengths[i] < max_length:
+                if sent_lengths[i] < max_out_length:
                     decoded[i, sent_lengths[i]] = eos_token_id
         else:
             # 否则直接堆叠起来
@@ -247,3 +313,25 @@ class T5Model(BasicT5):
 
         sent = [vocab.idList_to_sent(idList) for idList in inp.to('cpu')]
         return sent
+
+
+if __name__ == '__main__':
+    # decodetest
+    train_data_path = f"C:\\Users\\tianshu\\PycharmProjects\\project\\data\\ape\\test.ape.json"
+    val_data_path = f"C:\\Users\\tianshu\\PycharmProjects\\project\\data\\ape\\test.ape.json"
+
+    vocab_path = r"D:\codeproject\NLP\models\chinese_t5_pegasus_small\vocab.txt"
+    model_path = r"D:\codeproject\NLP\models\chinese_t5_pegasus_small\pytorch_model.bin"
+    model_save_path = r"D:\codeproject\NLP\models\chinese_t5_pegasus_small\t5_ancient_trans_model.bin"
+    batch_size = 8
+    lr = 1e-5
+    word2idx = load_chinese_base_vocab(vocab_path)
+    tokenizer = T5PegasusTokenizer(word2idx)
+    model = T5Model(word2idx, size="small")
+    model.load_pretrain_params(model_path)
+    tst = "王艳家买了一台洗衣机和一台电冰箱，一共花了6000元，电冰箱的价钱是洗衣机的3/5，求洗衣机的价钱．"
+    res = model.beam_search(tst,beam_size=5)
+    print(res)
+    print(tokenizer.decode(res.tolist()))
+    res2 = model.sample_generate_encoder_decoder(tst)
+    print(res2)
