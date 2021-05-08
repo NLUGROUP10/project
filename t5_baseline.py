@@ -28,7 +28,7 @@ val_data_path = "/home/zp2053/codes/nlu/ape/valid.ape.json"
 vocab_path = "/scratch/zp2053/bert_seq2seq/vocab/t5_small_vocab.txt"
 model_path = "/scratch/zp2053/bert_seq2seq/weights/t5_small_pytorch_model.bin"
 model_save_path = "/scratch/zp2053/bert_seq2seq/weights/t5_small_math_ques_model.bin"
-batch_size = 16
+batch_size = 32
 lr = 1e-5
 word2idx = load_chinese_base_vocab(vocab_path)
 tokenizer = T5PegasusTokenizer(word2idx)
@@ -220,15 +220,6 @@ class Trainer:
                 self.model.train()
                 print("report loss is " + str(report_loss))
 
-            if step % 10000 == 0:
-                ## 2000步集中测试一下
-                print("validing..........")
-                acc = self.validation()
-                print("valid acc is " + str(acc))
-                if acc > self.best_acc:
-                    self.best_acc = acc
-                    self.save(model_save_path)
-
             # 因为传入了target标签，因此会计算loss并且返回
             loss = self.model(token_ids,labels=labels_ids, decoder_input_ids=target_ids)[0]
             # 反向传播
@@ -243,6 +234,12 @@ class Trainer:
             # 为计算当前epoch的平均loss
             total_loss += loss.item()
             report_loss += loss.item()
+        print("validing..........")
+        acc = self.validation()
+        print("valid acc is " + str(acc))
+        if acc > self.best_acc:
+            self.best_acc = acc
+            self.save(model_save_path)
 
 
 
@@ -254,16 +251,24 @@ class Trainer:
         # 保存模型
         self.save(model_save_path)
 
+    def eval_equation(self, equation):
+        ans = -10000
+        try:
+            ans = eval(equation)
+        except:
+            pass
+        return ans
+
     def validation(self):
         val_data = load_data(val_data_path)
         self.model.eval()
         right = 0.0
         num = len(val_data)
         # for each_data in tqdm(val_data, total=num):
-        for each_data in val_data:
+        for each_data in tqdm(val_data):
             equation = self.model.sample_generate_encoder_decoder(each_data[0],add_eos=True)
 
-            pred_ans = self.model(equation.replace(" ", ""))
+            pred_ans = self.eval_equation(equation.replace(" ", ""))
             ans1 = each_data[2]
             try:
                 if "/" in each_data[2] or "+" in each_data[2] or "-" in each_data[2] or "*" in each_data[2]:
